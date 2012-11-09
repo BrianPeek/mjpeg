@@ -1,0 +1,9 @@
+﻿<Window x:Class="MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MainWindow" Height="580" Width="640">
+    <StackPanel>
+        <Image x:Name="image" Width="640" Height="480" />
+        <Button x:Name="Start" Content="Start" Click="Start_Click"/>
+    </StackPanel>
+</Window>
