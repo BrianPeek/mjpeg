@@ -16,6 +16,7 @@ namespace MjpegProcessorTestWPF
 			InitializeComponent();
 			_mjpeg = new MjpegDecoder();
 			_mjpeg.FrameReady += mjpeg_FrameReady;
+			_mjpeg.Error += _mjpeg_Error;
 		}
 
 		private void Start_Click(object sender, RoutedEventArgs e)
@@ -26,6 +27,11 @@ namespace MjpegProcessorTestWPF
 		private void mjpeg_FrameReady(object sender, FrameReadyEventArgs e)
 		{
 			image.Source = e.BitmapImage;
+		}
+
+		void _mjpeg_Error(object sender, ErrorEventArgs e)
+		{
+			MessageBox.Show(e.Message);
 		}
 	}
 }

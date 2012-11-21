@@ -24,6 +24,7 @@ namespace MjpegProcessorTestSL4
 			{
 				MjpegDecoder mjpeg = new MjpegDecoder();
 				mjpeg.FrameReady += mjpeg_FrameReady;
+				mjpeg.Error += mjpeg_Error;
 				mjpeg.ParseStream(new Uri("http://192.168.2.200/img/video.mjpeg"));
 			}
 		}
@@ -31,6 +32,11 @@ namespace MjpegProcessorTestSL4
 		private void mjpeg_FrameReady(object sender, FrameReadyEventArgs e)
 		{
 			image.Source = e.BitmapImage;
+		}
+
+		void mjpeg_Error(object sender, ErrorEventArgs e)
+		{
+			MessageBox.Show(e.Message);
 		}
 	}
 }
