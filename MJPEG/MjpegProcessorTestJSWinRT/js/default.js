@@ -25,7 +25,7 @@
 
 	var startHandler = function (ev) {
 		mjpeg.onframeready = frameReadyHandler;
-		mjpeg.parseStream(new Uri("http://192.168.2.200/img/video.mjpeg"));
+		mjpeg.parseStream(new Windows.Foundation.Uri("http://192.168.2.200/img/video.mjpeg"));
 	};
 
 	var frameReadyHandler = function (ev) {
