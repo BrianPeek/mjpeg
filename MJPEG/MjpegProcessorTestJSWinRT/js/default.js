@@ -25,6 +25,7 @@
 
 	var startHandler = function (ev) {
 		mjpeg.onframeready = frameReadyHandler;
+		mjpeg.onerror = errorHandler;
 		mjpeg.parseStream(new Windows.Foundation.Uri("http://192.168.2.200/img/video.mjpeg"));
 	};
 
@@ -34,6 +35,10 @@
 		reader.readBytes(bytes);
 		var blob = new Blob([bytes], { type: 'image/jpeg' });
 		document.getElementById('img').src = URL.createObjectURL(blob, { oneTimeOnly: true });
+	};
+
+	var errorHandler = function (error) {
+		new Windows.UI.Popups.MessageDialog(error.message).showAsync();
 	};
 
 	app.oncheckpoint = function (args) {

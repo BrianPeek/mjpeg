@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using MjpegProcessor;
 using Windows.Storage.Streams;
+using Windows.UI.Popups;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media.Imaging;
@@ -26,6 +27,7 @@ namespace MjpegProcessorTestWinRT
 			this.InitializeComponent();
 			_mjpeg = new MjpegDecoder();
 			_mjpeg.FrameReady += mjpeg_FrameReady;
+			_mjpeg.Error += _mjpeg_Error;
 		}
 
 		/// <summary>
@@ -49,6 +51,11 @@ namespace MjpegProcessorTestWinRT
 			stream.Seek(0);
 			_bmp.SetSource(stream);
 			image.Source = _bmp;
+		}
+
+		async void _mjpeg_Error(object sender, ErrorEventArgs e)
+		{
+			await new MessageDialog(e.Message).ShowAsync();
 		}
 	}
 }

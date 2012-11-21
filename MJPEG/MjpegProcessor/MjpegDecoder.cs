@@ -68,6 +68,7 @@ namespace MjpegProcessor
 
 		// event to get the buffer above handed to you
 		public event EventHandler<FrameReadyEventArgs> FrameReady;
+		public event EventHandler<ErrorEventArgs> Error;
 
 		public MjpegDecoder()
 		{
@@ -124,69 +125,85 @@ namespace MjpegProcessor
 
 			// get the response
 			HttpWebRequest req = (HttpWebRequest)asyncResult.AsyncState;
-			HttpWebResponse resp = (HttpWebResponse)req.EndGetResponse(asyncResult);
-
-			// find our magic boundary value
-			string contentType = resp.Headers["Content-Type"];
-			if(!string.IsNullOrEmpty(contentType) && !contentType.Contains("="))
-				throw new Exception("Invalid content-type header.  The camera is likely not returning a proper MJPEG stream.");
-			string boundary = resp.Headers["Content-Type"].Split('=')[1].Replace("\"", "");
-			byte[] boundaryBytes = Encoding.UTF8.GetBytes(boundary.StartsWith("--") ? boundary : "--" + boundary);
-
-			Stream s = resp.GetResponseStream();
-			BinaryReader br = new BinaryReader(s);
-
-			_streamActive = true;
-
-			byte[] buff = br.ReadBytes(ChunkSize);
-
-			while (_streamActive)
+			HttpWebResponse resp = null;
+			try
 			{
-				// find the JPEG header
-				int imageStart = buff.Find(JpegHeader);
+				resp = (HttpWebResponse)req.EndGetResponse(asyncResult);
 
-				if(imageStart != -1)
+				// find our magic boundary value
+				string contentType = resp.Headers["Content-Type"];
+				if(!string.IsNullOrEmpty(contentType) && !contentType.Contains("="))
+					throw new Exception("Invalid content-type header.  The camera is likely not returning a proper MJPEG stream.");
+				string boundary = resp.Headers["Content-Type"].Split('=')[1].Replace("\"", "");
+				byte[] boundaryBytes = Encoding.UTF8.GetBytes(boundary.StartsWith("--") ? boundary : "--" + boundary);
+
+				Stream s = resp.GetResponseStream();
+				BinaryReader br = new BinaryReader(s);
+
+				_streamActive = true;
+
+				byte[] buff = br.ReadBytes(ChunkSize);
+
+				while (_streamActive)
 				{
-					// copy the start of the JPEG image to the imageBuffer
-					int size = buff.Length - imageStart;
-					Array.Copy(buff, imageStart, imageBuffer, 0, size);
+					// find the JPEG header
+					int imageStart = buff.Find(JpegHeader);
 
-					while(true)
+					if(imageStart != -1)
 					{
-						buff = br.ReadBytes(ChunkSize);
+						// copy the start of the JPEG image to the imageBuffer
+						int size = buff.Length - imageStart;
+						Array.Copy(buff, imageStart, imageBuffer, 0, size);
 
-						// find the boundary text
-						int imageEnd = buff.Find(boundaryBytes);
-						if(imageEnd != -1)
+						while(true)
 						{
-							// copy the remainder of the JPEG to the imageBuffer
-							Array.Copy(buff, 0, imageBuffer, size, imageEnd);
-							size += imageEnd;
+							buff = br.ReadBytes(ChunkSize);
 
-							byte[] frame = new byte[size];
-							Array.Copy(imageBuffer, 0, frame, 0, size);
+							// find the boundary text
+							int imageEnd = buff.Find(boundaryBytes);
+							if(imageEnd != -1)
+							{
+								// copy the remainder of the JPEG to the imageBuffer
+								Array.Copy(buff, 0, imageBuffer, size, imageEnd);
+								size += imageEnd;
 
-							ProcessFrame(frame);
+								byte[] frame = new byte[size];
+								Array.Copy(imageBuffer, 0, frame, 0, size);
 
-							// copy the leftover data to the start
-							Array.Copy(buff, imageEnd, buff, 0, buff.Length - imageEnd);
+								ProcessFrame(frame);
 
-							// fill the remainder of the buffer with new data and start over
-							byte[] temp = br.ReadBytes(imageEnd);
+								// copy the leftover data to the start
+								Array.Copy(buff, imageEnd, buff, 0, buff.Length - imageEnd);
 
-							Array.Copy(temp, 0, buff, buff.Length - imageEnd, temp.Length);
-							break;
+								// fill the remainder of the buffer with new data and start over
+								byte[] temp = br.ReadBytes(imageEnd);
+
+								Array.Copy(temp, 0, buff, buff.Length - imageEnd, temp.Length);
+								break;
+							}
+
+							// copy all of the data to the imageBuffer
+							Array.Copy(buff, 0, imageBuffer, size, buff.Length);
+							size += buff.Length;
 						}
-
-						// copy all of the data to the imageBuffer
-						Array.Copy(buff, 0, imageBuffer, size, buff.Length);
-						size += buff.Length;
 					}
 				}
-			}
 #if !WINRT
-			resp.Close();
+				resp.Close();
 #endif
+			}
+			catch(Exception ex)
+			{
+#if WINRT
+				if(Error != null)
+					_dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => Error(this, new ErrorEventArgs() { Message = ex.Message, ErrorCode = ex.HResult }));
+#else
+				if(Error != null)
+					_context.Post(delegate { Error(this, new ErrorEventArgs() { Message = ex.Message }); }, null);
+#endif
+
+				return;
+			}
 		}
 
 #if WINRT
@@ -302,4 +319,13 @@ namespace MjpegProcessor
 #endif
 	}
 #endif
+
+	public sealed class ErrorEventArgs
+#if !WINRT
+								: EventArgs
+#endif
+	{
+		public string Message { get; set; }
+		public int ErrorCode { get; set; }
+	}
 }
