@@ -3,7 +3,7 @@ using System.Text;
 using System.Net;
 using System.IO;
 
-#if !XNA
+#if !XNA && !WINRT
 using System.Threading;
 using System.Windows;
 using System.Windows.Media.Imaging;
@@ -11,6 +11,11 @@ using System.Windows.Media.Imaging;
 
 #if SILVERLIGHT
 using System.Net.Browser;
+#elif WINRT
+using Windows.Graphics.Imaging;
+using Windows.Storage.Streams;
+using Windows.UI.Core;
+using System.Runtime.InteropServices.WindowsRuntime;
 #elif !XNA
 using System.Drawing;
 #endif
@@ -21,15 +26,19 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace MjpegProcessor
 {
+#if WINRT
+	public sealed class MjpegDecoder
+#else
 	public class MjpegDecoder
+#endif
 	{
-#if !SILVERLIGHT && !XNA
+#if !SILVERLIGHT && !XNA && !WINRT
 		// WinForms & WPF
 		public Bitmap Bitmap { get; set; }
 #endif
 
 		// magic 2 byte header for JPEG images
-		private byte[] JpegHeader = new byte[] { 0xff, 0xd8 };
+		private readonly byte[] JpegHeader = new byte[] { 0xff, 0xd8 };
 
 		// pull down 1024 bytes at a time
 		private const int ChunkSize = 1024;
@@ -37,28 +46,41 @@ namespace MjpegProcessor
 		// used to cancel reading the stream
 		private bool _streamActive;
 
+#if WINRT
+		// current encoded JPEG image
+		public IBuffer CurrentFrame { get; private set; }
+#else
 		// current encoded JPEG image
 		public byte[] CurrentFrame { get; private set; }
+#endif
 
-#if !XNA
-		// WPF and Silverlight
+#if !XNA && !WINRT
+		// WPF, Silverlight
 		public BitmapImage BitmapImage { get; set; }
+#endif
 
+#if !XNA && !WINRT
 		// used to marshal back to UI thread
 		private SynchronizationContext _context;
+#elif WINRT
+		private readonly CoreDispatcher _dispatcher;
+#endif
 
 		// event to get the buffer above handed to you
 		public event EventHandler<FrameReadyEventArgs> FrameReady;
-#endif
 
 		public MjpegDecoder()
 		{
-#if !XNA
+#if !XNA && !WINRT
 			_context = SynchronizationContext.Current;
 
 			BitmapImage = new BitmapImage();
+#elif WINRT
+			if(CoreWindow.GetForCurrentThread() != null)
+				_dispatcher = CoreWindow.GetForCurrentThread().Dispatcher;
 #endif
 		}
+
 
 		public void ParseStream(Uri uri)
 		{
@@ -98,14 +120,11 @@ namespace MjpegProcessor
 #endif
 		private void OnGetResponse(IAsyncResult asyncResult)
 		{
-			HttpWebResponse resp;
-			byte[] buff;
 			byte[] imageBuffer = new byte[1024 * 1024];
-			Stream s;
 
 			// get the response
 			HttpWebRequest req = (HttpWebRequest)asyncResult.AsyncState;
-			resp = (HttpWebResponse)req.EndGetResponse(asyncResult);
+			HttpWebResponse resp = (HttpWebResponse)req.EndGetResponse(asyncResult);
 
 			// find our magic boundary value
 			string contentType = resp.Headers["Content-Type"];
@@ -114,24 +133,22 @@ namespace MjpegProcessor
 			string boundary = resp.Headers["Content-Type"].Split('=')[1].Replace("\"", "");
 			byte[] boundaryBytes = Encoding.UTF8.GetBytes(boundary.StartsWith("--") ? boundary : "--" + boundary);
 
-			s = resp.GetResponseStream();
+			Stream s = resp.GetResponseStream();
 			BinaryReader br = new BinaryReader(s);
 
 			_streamActive = true;
 
-			buff = br.ReadBytes(ChunkSize);
+			byte[] buff = br.ReadBytes(ChunkSize);
 
 			while (_streamActive)
 			{
-				int size;
-
 				// find the JPEG header
 				int imageStart = buff.Find(JpegHeader);
 
 				if(imageStart != -1)
 				{
 					// copy the start of the JPEG image to the imageBuffer
-					size = buff.Length - imageStart;
+					int size = buff.Length - imageStart;
 					Array.Copy(buff, imageStart, imageBuffer, 0, size);
 
 					while(true)
@@ -146,12 +163,11 @@ namespace MjpegProcessor
 							Array.Copy(buff, 0, imageBuffer, size, imageEnd);
 							size += imageEnd;
 
-							// create a single JPEG frame
-							CurrentFrame = new byte[size];
-							Array.Copy(imageBuffer, 0, CurrentFrame, 0, size);
-#if !XNA
-							ProcessFrame(CurrentFrame);
-#endif
+							byte[] frame = new byte[size];
+							Array.Copy(imageBuffer, 0, frame, 0, size);
+
+							ProcessFrame(frame);
+
 							// copy the leftover data to the start
 							Array.Copy(buff, imageEnd, buff, 0, buff.Length - imageEnd);
 
@@ -168,17 +184,27 @@ namespace MjpegProcessor
 					}
 				}
 			}
+#if !WINRT
 			resp.Close();
+#endif
 		}
 
-		private void ProcessFrame(byte[] frameBuffer)
+#if WINRT
+		private async void ProcessFrame(byte[] frame)
 		{
+			CurrentFrame = frame.AsBuffer();
+#else
+		private void ProcessFrame(byte[] frame)
+		{
+			CurrentFrame = frame;
+#endif
+
 #if SILVERLIGHT
 			// need to get this back on the UI thread
 			_context.Post(delegate
 			{
 				// resets the BitmapImage to the new frame
-				BitmapImage.SetSource(new MemoryStream(frameBuffer, 0, frameBuffer.Length));
+				BitmapImage.SetSource(new MemoryStream(frame, 0, frame.Length));
 
 				// tell whoever's listening that we have a frame to draw
 				if(FrameReady != null)
@@ -186,7 +212,7 @@ namespace MjpegProcessor
 			}, null);
 #endif
 
-#if !SILVERLIGHT && !XNA
+#if !SILVERLIGHT && !XNA && !WINRT
 			// no Application.Current == WinForms
 			if(Application.Current != null)
 			{
@@ -196,12 +222,12 @@ namespace MjpegProcessor
 					// create a new BitmapImage from the JPEG bytes
 					BitmapImage = new BitmapImage();
 					BitmapImage.BeginInit();
-					BitmapImage.StreamSource = new MemoryStream(frameBuffer);
+					BitmapImage.StreamSource = new MemoryStream(frame);
 					BitmapImage.EndInit();
 
 					// tell whoever's listening that we have a frame to draw
 					if(FrameReady != null)
-						FrameReady(this, new FrameReadyEventArgs { FrameBuffer = CurrentFrame, Bitmap = Bitmap, BitmapImage = BitmapImage });
+						FrameReady(this, new FrameReadyEventArgs { FrameBuffer = CurrentFrame, BitmapImage = BitmapImage });
 				}, null);
 			}
 			else
@@ -209,18 +235,28 @@ namespace MjpegProcessor
 				_context.Post(delegate
 				{
 					// create a simple GDI+ happy Bitmap
-					Bitmap = new Bitmap(new MemoryStream(frameBuffer));
+					Bitmap = new Bitmap(new MemoryStream(frame));
 
 					// tell whoever's listening that we have a frame to draw
 					if(FrameReady != null)
-						FrameReady(this, new FrameReadyEventArgs { FrameBuffer = CurrentFrame, Bitmap = Bitmap, BitmapImage = BitmapImage });
+						FrameReady(this, new FrameReadyEventArgs { FrameBuffer = CurrentFrame, Bitmap = Bitmap });
 				}, null);
+			}
+#elif WINRT
+			if(_dispatcher != null)
+			{
+				await _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+				{
+					// tell whoever's listening that we have a frame to draw
+					if (FrameReady != null)
+						FrameReady(this, new FrameReadyEventArgs { FrameBuffer = frame.AsBuffer() });
+				});
 			}
 #endif
 		}
 	}
 
-	public static class Extensions
+	static class Extensions
 	{
 		public static int Find(this byte[] buff, byte[] search)
 		{
@@ -249,14 +285,21 @@ namespace MjpegProcessor
 		}
 	}
 
+#if WINRT
+	public sealed class FrameReadyEventArgs
+	{
+		public IBuffer FrameBuffer { get; set; }
+	}
+#else
 	public class FrameReadyEventArgs : EventArgs
 	{
 		public byte[] FrameBuffer;
-#if !SILVERLIGHT && !XNA
+#if !SILVERLIGHT && !XNA && !WINRT
 		public Bitmap Bitmap;
 #endif
 #if !XNA
 		public BitmapImage BitmapImage;
 #endif
 	}
+#endif
 }

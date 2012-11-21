@@ -1,19 +1,19 @@
 ﻿using System;
 using System.Windows;
+using Microsoft.Phone.Controls;
 using MjpegProcessor;
 
-namespace MjpegProcessorTestWPF
+namespace MjpegProcessorTestWP8
 {
-	/// <summary>
-	/// Interaction logic for MainWindow.xaml
-	/// </summary>
-	public partial class MainWindow : Window
+	public partial class MainPage : PhoneApplicationPage
 	{
-		readonly MjpegDecoder _mjpeg;
+		private MjpegDecoder _mjpeg;
 
-		public MainWindow()
+		// Constructor
+		public MainPage()
 		{
 			InitializeComponent();
+
 			_mjpeg = new MjpegDecoder();
 			_mjpeg.FrameReady += mjpeg_FrameReady;
 		}
