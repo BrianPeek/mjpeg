@@ -93,7 +93,7 @@ namespace MjpegProcessor
 #if SILVERLIGHT
 			HttpWebRequest.RegisterPrefix("http://", WebRequestCreator.ClientHttp);
 #endif
-			HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uri);
+			HttpWebRequest request = (HttpWebRequest)WebRequest.Create(uri);
 			if(!string.IsNullOrEmpty(username) || !string.IsNullOrEmpty(password))
 				request.Credentials = new NetworkCredential(username, password);
 
@@ -125,10 +125,10 @@ namespace MjpegProcessor
 
 			// get the response
 			HttpWebRequest req = (HttpWebRequest)asyncResult.AsyncState;
-			HttpWebResponse resp = null;
+
 			try
 			{
-				resp = (HttpWebResponse)req.EndGetResponse(asyncResult);
+				HttpWebResponse resp = (HttpWebResponse)req.EndGetResponse(asyncResult);
 
 				// find our magic boundary value
 				string contentType = resp.Headers["Content-Type"];
@@ -188,7 +188,9 @@ namespace MjpegProcessor
 						}
 					}
 				}
-#if !WINRT
+#if WINRT
+				resp.Dispose();
+#else
 				resp.Close();
 #endif
 			}
