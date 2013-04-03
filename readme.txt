@@ -1,4 +1,4 @@
-MJPEG Decoder v1.2
+MJPEG Decoder v1.2.1
 by Brian Peek (http://www.brianpeek.com/)
 
 There are several assemblies in this package.  Select the one that matches the project type you're building:
@@ -17,6 +17,10 @@ http://channel9.msdn.com/coding4fun/articles/MJPEG-Decoder
 
 Changelog
 ---------
+v1.2.1
+	- WinRT fix so response streams are properly disposed
+	- The remaining assemblies remain at v1.2
+
 v1.2
 	- WinRT support
 	- Error event handler
