@@ -5,7 +5,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Silverlight", "Silverlight"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{175ADA72-4CD9-4FF8-95C7-A817AE7BF0FF}"
 	ProjectSection(SolutionItems) = preProject
-		readme.txt = readme.txt
+		..\readme.txt = ..\readme.txt
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MjpegProcessor", "MjpegProcessor\MjpegProcessor.csproj", "{ADC20CFA-93C9-4F69-A7B7-D19CF455A9D5}"
