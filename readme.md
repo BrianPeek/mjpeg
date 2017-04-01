@@ -1,7 +1,8 @@
-**Project Description**
 Library to decode MJPEG streams.  Sample code showing usage is included with the distribution.  For more information, see the full article at Coding4Fun.
 
 * [Coding4Fun Article](http://channel9.msdn.com/coding4fun/articles/MJPEG-Decoder)
+
+--
 
 MJPEG Decoder v1.2.1
 by Brian Peek (http://www.brianpeek.com/)
